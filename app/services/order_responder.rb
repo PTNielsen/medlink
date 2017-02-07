@@ -1,32 +1,39 @@
 class OrderResponder
-  attr_reader :responded_by, :response
-
-  def initialize responded_by:, response:
-    @responded_by, @response = responded_by, response
+  def self.build
+    new notifier: Medlink.notifier, recorder: ResponseRecorder.new
   end
 
-  def respond response_params, orders
-    response.update_attributes(response_params) || raise("Failed to update response")
-    attach_orders orders.select { |_,data| data.include? "delivery_method" }
-    response.send!
-    response.mark_updated_orders!
-    update_waiting! response.user
-    if response.auto_archivable?
-      response.mark_received! by: responded_by
+  def initialize notifier:, recorder:
+    @recorder, @notifier = recorder, notifier
+  end
+
+  def build user_id:, text: nil, selections: {}
+    user = User.find user_id
+    response = user.responses.new country_id: user.country_id, extra_text: text
+    Order.find(selections.keys).each do |order|
+      order.delivery_method = selections.fetch(order.id)
+      response.orders << order
     end
+    response
   end
 
-  private #----------
+  def save response
+    return if response.orders.none?
+    recorder.call response
+    notifier.call Notification::ResponseCreated.new response
+    queue_receipt_reminders response
+    response
+  end
 
-  def attach_orders order_params
-    Order.where(id: order_params.keys).each do |o|
-      data = order_params[o.id.to_s].merge response_id: @response.id
-      o.update_attributes data.permit :delivery_method, :response_id
+  private
+
+  attr_reader :recorder, :notifier
+
+  def queue_receipt_reminders response
+    return unless response.orders.any? { |o| o.delivery_method == DeliveryMethod::Delivery }
+    [14, 17, 20, 23].each do |offset|
+      at = response.created_at + offset.days
+      PromptForReceiptAcknowledgementJob.set(wait_until: at).perform_later response
     end
-  end
-
-  def update_waiting! user
-    user.update_attributes \
-      waiting_since: user.orders.without_responses.minimum(:created_at)
   end
 end

@@ -1,9 +1,14 @@
-class Phone < ActiveRecord::Base
+class Phone < ApplicationRecord
   belongs_to :user
+  has_many :messages, class_name: "SMS"
 
-  before_save { |rec| rec.condensed = Phone.condense rec.number }
+  before_validation on: :create do |p|
+    p.condensed ||= Phone.condense(p.number)
+  end
 
-  validates :condensed, uniqueness: { scope: :user_id }
+  include Concerns::Immutable
+  validates :condensed, presence: true, uniqueness: true, on: :create
+  immutable :number, :condensed
 
   def has_country_code
     unless number.start_with? '+'
@@ -13,10 +18,27 @@ class Phone < ActiveRecord::Base
   validate :has_country_code
 
   def self.condense number
-    number.gsub /[^+\d]/, ''
+    number.gsub(/[^+\d]/, '')
   end
 
-  def self.lookup number
-    where(condensed: condense(number)).first
+  def self.standardize number
+    n = condense number
+    n.start_with?("+") ? n : "+#{n}"
+  end
+
+  def self.for number:
+    normalized = condense number
+    normalized = "+#{normalized}" unless normalized.start_with? "+"
+    if found = Phone.find_by_condensed(normalized)
+      found
+    else
+      Phone.create! number: number, condensed: normalized
+    end
+  end
+
+  def self.conflicts condensed:, user:
+    Phone.includes(:user).
+      where.not(user_id: [user.id, nil]).
+      where(condensed: condensed, users: { active: true })
   end
 end

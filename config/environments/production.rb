@@ -9,7 +9,7 @@ Medlink::Application.configure do
   config.action_controller.perform_caching = true
 
   # Disable Rails's static asset server (Apache or nginx will already do this)
-  config.serve_static_files = false
+  config.public_file_server.enabled = false
 
   # Compress JavaScripts and CSS
   config.assets.compress = true
@@ -74,5 +74,21 @@ Medlink::Application.configure do
   config.after_initialize do
     Bullet.enable  = true
     Bullet.rollbar = true
+  end
+
+  Rails.application.routes.default_url_options[:host] = "pcmedlink.org"
+
+  bot_opts = {
+    username:   ENV.fetch("SLACK_BOT_NAME", "Medlink"),
+    icon_emoji: ":hospital:"
+  }
+
+  config.container.slackbot { Medlink::Slackbot.build bot_opts.merge channel: "#medlink"      }
+  config.container.pingbot  { Medlink::Slackbot.build bot_opts.merge channel: "#medlink-logs" }
+  config.container.slow_request_notifier do
+    SlowRequestNotifier.build notifier: config.container.resolve(:notifier)
+  end
+  config.container.sms_deliverer do
+    ->(sms:, twilio:) { twilio.client.messages.create sms if twilio.client }
   end
 end

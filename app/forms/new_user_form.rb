@@ -1,0 +1,2 @@
+class NewUserForm < UserForm
+end

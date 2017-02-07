@@ -1,4 +1,3 @@
-# encoding: UTF-8
 # This file is auto-generated from the current state of the database. Instead
 # of editing this file, please use the migrations feature of Active Record to
 # incrementally modify your database, and then regenerate this schema definition.
@@ -11,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema.define(version: 20150821141705) do
+ActiveRecord::Schema.define(version: 20160701002441) do
 
   # These are extensions that must be enabled in order to support this database
   enable_extension "plpgsql"
@@ -23,13 +22,14 @@ ActiveRecord::Schema.define(version: 20150821141705) do
     t.datetime "last_sent_at"
     t.datetime "created_at",   null: false
     t.datetime "updated_at",   null: false
+    t.datetime "deleted_at"
+    t.index ["country_id"], name: "index_announcements_on_country_id", using: :btree
   end
-
-  add_index "announcements", ["country_id"], name: "index_announcements_on_country_id", using: :btree
 
   create_table "countries", force: :cascade do |t|
     t.string  "name",              limit: 255
     t.integer "twilio_account_id"
+    t.string  "time_zone"
   end
 
   create_table "country_supplies", force: :cascade do |t|
@@ -37,10 +37,17 @@ ActiveRecord::Schema.define(version: 20150821141705) do
     t.integer  "supply_id"
     t.datetime "created_at"
     t.datetime "updated_at"
+    t.index ["country_id"], name: "index_country_supplies_on_country_id", using: :btree
+    t.index ["supply_id"], name: "index_country_supplies_on_supply_id", using: :btree
   end
 
-  add_index "country_supplies", ["country_id"], name: "index_country_supplies_on_country_id", using: :btree
-  add_index "country_supplies", ["supply_id"], name: "index_country_supplies_on_supply_id", using: :btree
+  create_table "encrypt_challenges", force: :cascade do |t|
+    t.string   "pre",        null: false
+    t.string   "post",       null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["pre"], name: "index_encrypt_challenges_on_pre", using: :btree
+  end
 
   create_table "messages", force: :cascade do |t|
     t.datetime "created_at"
@@ -49,10 +56,12 @@ ActiveRecord::Schema.define(version: 20150821141705) do
     t.integer  "direction"
     t.integer  "user_id"
     t.integer  "twilio_account_id"
+    t.integer  "phone_id",                      null: false
+    t.text     "send_error"
+    t.index ["phone_id"], name: "index_messages_on_phone_id", using: :btree
+    t.index ["twilio_account_id"], name: "index_messages_on_twilio_account_id", using: :btree
+    t.index ["user_id"], name: "index_messages_on_user_id", using: :btree
   end
-
-  add_index "messages", ["twilio_account_id"], name: "index_messages_on_twilio_account_id", using: :btree
-  add_index "messages", ["user_id"], name: "index_messages_on_user_id", using: :btree
 
   create_table "orders", force: :cascade do |t|
     t.datetime "created_at"
@@ -69,7 +78,18 @@ ActiveRecord::Schema.define(version: 20150821141705) do
     t.datetime "created_at"
     t.integer  "user_id"
     t.string   "number",     limit: 255
-    t.string   "condensed",  limit: 255
+    t.string   "condensed",              null: false
+    t.string   "send_error"
+  end
+
+  create_table "receipt_reminders", force: :cascade do |t|
+    t.integer  "user_id"
+    t.integer  "response_id"
+    t.integer  "message_id"
+    t.datetime "created_at",  null: false
+    t.index ["message_id"], name: "index_receipt_reminders_on_message_id", using: :btree
+    t.index ["response_id"], name: "index_receipt_reminders_on_response_id", using: :btree
+    t.index ["user_id"], name: "index_receipt_reminders_on_user_id", using: :btree
   end
 
   create_table "requests", force: :cascade do |t|
@@ -87,22 +107,32 @@ ActiveRecord::Schema.define(version: 20150821141705) do
     t.integer  "country_id"
     t.integer  "user_id"
     t.integer  "message_id"
-    t.string   "extra_text",     limit: 255
+    t.text     "extra_text"
     t.datetime "archived_at"
-    t.boolean  "flagged",                    default: false, null: false
+    t.boolean  "flagged",        default: false, null: false
     t.datetime "received_at"
     t.integer  "received_by"
     t.datetime "cancelled_at"
     t.integer  "replacement_id"
   end
 
+  create_table "roster_uploads", force: :cascade do |t|
+    t.integer  "uploader_id"
+    t.string   "uri"
+    t.text     "body"
+    t.datetime "created_at",  null: false
+    t.datetime "updated_at",  null: false
+    t.integer  "country_id"
+    t.index ["country_id"], name: "index_roster_uploads_on_country_id", using: :btree
+    t.index ["uploader_id"], name: "index_roster_uploads_on_uploader_id", using: :btree
+  end
+
   create_table "supplies", force: :cascade do |t|
     t.string  "shortcode", limit: 255
     t.string  "name",      limit: 255
     t.boolean "orderable",             default: true
+    t.index ["shortcode"], name: "index_supplies_on_shortcode", using: :btree
   end
-
-  add_index "supplies", ["shortcode"], name: "index_supplies_on_shortcode", using: :btree
 
   create_table "twilio_accounts", force: :cascade do |t|
     t.string   "sid",        limit: 255
@@ -139,20 +169,25 @@ ActiveRecord::Schema.define(version: 20150821141705) do
     t.datetime "confirmed_at"
     t.datetime "confirmation_sent_at"
     t.boolean  "active",                             default: true
+    t.string   "secret_key"
+    t.index ["confirmation_token"], name: "index_users_on_confirmation_token", unique: true, using: :btree
+    t.index ["email"], name: "index_users_on_email", unique: true, using: :btree
+    t.index ["reset_password_token"], name: "index_users_on_reset_password_token", unique: true, using: :btree
   end
 
-  add_index "users", ["confirmation_token"], name: "index_users_on_confirmation_token", unique: true, using: :btree
-  add_index "users", ["email"], name: "index_users_on_email", unique: true, using: :btree
-  add_index "users", ["reset_password_token"], name: "index_users_on_reset_password_token", unique: true, using: :btree
-
   add_foreign_key "announcements", "countries"
+  add_foreign_key "countries", "twilio_accounts"
   add_foreign_key "country_supplies", "countries"
   add_foreign_key "country_supplies", "supplies"
+  add_foreign_key "messages", "phones"
   add_foreign_key "messages", "twilio_accounts"
   add_foreign_key "messages", "users"
   add_foreign_key "orders", "requests"
   add_foreign_key "orders", "supplies"
   add_foreign_key "phones", "users"
+  add_foreign_key "receipt_reminders", "messages"
+  add_foreign_key "receipt_reminders", "responses"
+  add_foreign_key "receipt_reminders", "users"
   add_foreign_key "requests", "countries"
   add_foreign_key "requests", "messages"
   add_foreign_key "requests", "responses", column: "reorder_of_id"
@@ -162,4 +197,6 @@ ActiveRecord::Schema.define(version: 20150821141705) do
   add_foreign_key "responses", "requests", column: "replacement_id"
   add_foreign_key "responses", "users"
   add_foreign_key "responses", "users", column: "received_by"
+  add_foreign_key "roster_uploads", "countries"
+  add_foreign_key "roster_uploads", "users", column: "uploader_id"
 end

@@ -1,4 +1,9 @@
-class Report::Users < Report
+class Report::Users < Report::Base
+  model       User
+  title       "Users"
+  description "Users and their information"
+  authorize { |user| user.admin? }
+
   def initialize users
     self.rows = users.includes :phones, :country
   end
@@ -13,10 +18,11 @@ class Report::Users < Report
       "First"       => user.first_name,
       "Last"        => user.last_name,
       "Email"       => user.email,
-      "Phone"       => phone.try(:number),
+      "Phones"      => user.phones.map(&:number).join(","),
       "Country"     => country.name,
       "Role"        => user.role,
-      "Location"    => user.location
+      "Location"    => user.location,
+      "Active"      => user.active?
     }
   end
 end

@@ -1,8 +1,8 @@
-class User < ActiveRecord::Base
+class User < ApplicationRecord
   devise :database_authenticatable, :confirmable,
          :recoverable, :rememberable, :trackable, :validatable
 
-  default_scope { where(active: true) }
+  scope :active, -> { where active: true }
 
   enum role: [ :pcv, :pcmo, :admin ]
   def self.role_names
@@ -20,34 +20,33 @@ class User < ActiveRecord::Base
   has_many :requests
   has_many :orders
   has_many :responses
+  has_many :receipt_reminders
 
   has_many :phones, dependent: :destroy
   has_many :messages, class_name: "SMS"
-  accepts_nested_attributes_for :phones, allow_destroy: true
+
+  has_many :submitted_requests, foreign_key: "entered_by", class_name: "Request"
+  has_many :roster_uploads, foreign_key: "uploader_id"
 
   validates_presence_of :country, :location, :first_name, :last_name, :role
   validates :pcv_id, presence: true, uniqueness: true, if: :pcv?
-  validates :time_zone, inclusion: {in: ActiveSupport::TimeZone.all.map(&:name) }
+  validates :time_zone, inclusion: { in: Country.time_zones.map(&:name) }
 
-  def self.due_cutoff
-    now    = Time.now
-    oldest = now.at_beginning_of_month
-    now.day < 3 ? oldest - 1.month : oldest
-  end
+  scope :past_due, -> { where ["waiting_since  < ?", DueDate.cutoff] }
+  scope :pending,  -> { where ["waiting_since >= ?", DueDate.cutoff] }
 
-  scope :past_due, -> { where ["waiting_since  < ?", due_cutoff] }
-  scope :pending,  -> { where ["waiting_since >= ?", due_cutoff] }
-
-  def self.find_by_pcv_id str
-    where(['lower(pcv_id) = ?', str.downcase]).first
-  end
-
-  def self.find_by_phone_number number
-    Phone.lookup(number).try :user
+  before_validation on: :create do |u|
+    u.time_zone  = u.country.time_zone unless u.time_zone.present?
+    u.password ||= SecureRandom.hex(64)
   end
 
   def primary_phone
     @_primary_phone ||= phones.first
+  end
+
+  def claim_phone_number number
+    p = Phone.for number: number
+    p.update! user: self
   end
 
   def name
@@ -59,24 +58,12 @@ class User < ActiveRecord::Base
   end
 
   def send_text message
-    twilio = country.twilio_account
-    to     = primary_phone.try :number
-    return unless to
-    return if spammy? to, message
-    twilio.send_text to, message
-  rescue Twilio::REST::RequestError => e
-    # :nocov:
-    Rails.logger.error "Error while texting #{email} - #{e}"
-    # :nocov:
-  end
-
-  def spammy? number, text
-    last = messages.newest
-    last && last.text == text && last.number == number && last.outgoing?
+    return unless primary_phone
+    UserTexter.new(phone: primary_phone, twilio_account: country.twilio_account).send message
   end
 
   def available_supplies
-    country.supplies
+    country.available_supplies
   end
 
   def sms_contact_number
@@ -84,19 +71,39 @@ class User < ActiveRecord::Base
     "#{n[0..-11]} (#{n[-10..-8]}) #{n[-7..-5]}-#{n[-4..-1]}"
   end
 
-  def welcome_video
-    if pcv?
-      Video::PCV_WELCOME
+  def inactivate!
+    update! active: false
+  end
+
+  def activate!
+    update! active: true
+  end
+
+  def personal_requests
+    Request.where user_id: id, entered_by: id
+  end
+
+  def ensure_secret_key!
+    update! secret_key: ApiAuth.generate_secret_key unless secret_key.present?
+  end
+
+  def countries_managed_by_priority
+    if admin?
+      Country.all.to_a.sort do |a,b|
+        if a.id == country_id
+          -1
+        elsif b.id == country_id
+          1
+        else
+          a.name <=> b.name
+        end
+      end
     else
-      Video::PCMO_WELCOME
+      [country]
     end
   end
 
-  def record_welcome!
-    self.update!(welcome_video_shown_at: Time.now)
-  end
-
-  def welcome_video_seen?
-    !self.welcome_video_shown_at.nil?
+  def outstanding_orders
+    orders.without_responses
   end
 end

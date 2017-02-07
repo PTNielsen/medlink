@@ -1,40 +1,20 @@
-class TwilioAccount < ActiveRecord::Base
+class TwilioAccount < ApplicationRecord
   has_many :messages, class_name: "SMS"
 
-  def self.default
-    where(
-      sid:    ENV.fetch('TWILIO_ACCOUNT_SID'),
-      auth:   ENV.fetch('TWILIO_AUTH'),
-      number: ENV.fetch('TWILIO_PHONE_NUMBER')
-    ).first_or_create!
+  validates :sid, presence: true, uniqueness: true
+
+  def send_text to:, text:
+    phone = Phone.for number: to
+    UserTexter.new(phone: phone, twilio_account: self).send text
   end
 
   def client
-    @_client ||= Twilio::REST::Client.new sid, auth
+    # :nocov:
+    @_client ||= auth.present? && Twilio::REST::Client.new(sid, auth)
+    # :nocov:
   end
 
-  def send_text to, text
-    user = User.find_by_phone_number to
-
-    sms = messages.create!(
-      user:      user,
-      number:    to,
-      text:      text,
-      direction: :outgoing
-    )
-
-    if Rails.env.development?
-      # :nocov:
-      Rails.logger.info "Sending #{sms.text} to #{to}"
-      # :nocov:
-    else
-      client.account.sms.messages.create(
-        from: number,
-        to:   Phone.condense(to),
-        body: text
-      )
-    end
-
-    sms
+  def self.null
+    where(sid: "!!!", number: "+15555555555").first_or_create!
   end
 end

@@ -8,8 +8,8 @@ Medlink::Application.configure do
   config.cache_classes = true
 
   # Configure static asset server for tests with Cache-Control for performance
-  config.serve_static_files = true
-  config.static_cache_control = "public, max-age=3600"
+  config.public_file_server.enabled = true
+  config.public_file_server.headers = { 'Cache-Control' => "public, max-age=3600" }
 
   # Show full error reports and disable caching
   config.consider_all_requests_local       = true
@@ -29,17 +29,17 @@ Medlink::Application.configure do
   # Print deprecation notices to the stderr
   config.active_support.deprecation = :stderr
 
-  # For email specs
   config.action_mailer.default_url_options = { :host => 'localhost:3000' }
+  Rails.application.routes.default_url_options[:host] = "localhost:3000"
 
   config.eager_load = false
 
-  config.after_initialize do
-    Bullet.enable = true
-    Bullet.raise  = true
+  config.active_job.queue_adapter = :test
 
-    # See e.g. `app/controllers/requests_controller.rb`'s @request.save!
-    #   hitting the `before_save` in the UserScope concern ...
-    Bullet.add_whitelist type: :n_plus_one_query, class_name: "User", association: :country
-  end if ENV["BULLET"]
+  config.after_initialize do
+    Bullet.enable       = true
+    Bullet.rails_logger = true
+  end unless ENV["NO_BULLET"]
+
+  config.container.report_uploader { ReportUploader.build live: false }
 end

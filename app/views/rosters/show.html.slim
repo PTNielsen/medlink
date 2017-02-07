@@ -1,0 +1,11 @@
+= react_component 'Roster', countriesToLoad: @countries do
+  .col-md-4
+    - if policy(:roster).create?
+      / TODO: reactify this
+      = s3_uploader_form \
+        id: "roster_upload_form",
+        callback_url: upload_country_roster_path do
+        = file_field_tag :file, placeholder: "Upload CSV", multiple: true, class: "form-control"
+  .col-md-4
+    - if policy(:user).create?
+      = link_to "New User", new_admin_user_path, class: "btn btn-default"

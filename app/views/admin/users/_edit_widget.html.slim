@@ -1,0 +1,5 @@
+= form_tag select_admin_users_path, class: "form-inline auto-select", method: :get do
+  = collection_select :user, :id,
+    policy_scope(current_user.country.users).order(last_name: :asc), :id, :name,
+    { selected: selected, prompt: "Select User to edit" }, class: "form-control"
+  button.btn.btn-primary(type="submit") Select

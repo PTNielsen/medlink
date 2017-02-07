@@ -1,32 +1,47 @@
 source 'https://rubygems.org'
 
-ruby '2.2.2'
+ruby '2.3.1'
 
-gem 'rails'
+gem 'rails', '~> 5.0.0'
 
 gem 'pg'
 gem 'jquery-rails'
-gem 'haml-rails'
+gem 'slim-rails'
+gem 'jbuilder'
 gem 'twilio-ruby'
-gem 'jquery-placeholder-rails'
+gem 'pry-rails'
 
+gem 'figaro'
 gem 'devise'
 gem 'pundit'
+gem 'api-auth'
 
 gem 'rollbar'
 gem 'sidekiq'
-gem 'sinatra', require: nil
+gem 'sinatra', require: nil, github: 'sinatra' # 'til Sidekiq resolves the rack/showexceptions require for Rails 5
 
 gem 'kaminari'
 gem 'virtus'
+gem 'dry-types'
+gem 'dry-container'
+gem 'ice_nine'
 
-gem 'nested_form'
+gem 'reform', '~> 2.2.0'
+gem 'reform-rails'
+gem 'dry-validation'
 
-gem 'quiet_assets'
+# TODO: need to drop draper as a dependency
+gem 'draper', github: 'audionerd/draper', branch: 'rails5' # Released version breaks Rake tasks (!)
+gem 'activemodel-serializers-xml' # Removed from Rails, still a dependency for draper
 
 gem 'bullet'
 
 gem 'bootstrap_form'
+gem 's3_direct_upload'
+
+gem 'aws-sdk'
+
+gem 'react-rails'
 
 group :assets do
   gem 'sass-rails'
@@ -34,9 +49,15 @@ group :assets do
   gem 'uglifier'
 end
 
+group :development do
+  gem 'better_errors'
+  gem 'binding_of_caller'
+end
+
 group :development, :test do
+  gem 'activerecord-import'
+  gem 'named_seeds'
   gem 'letter_opener'
-  gem 'pry-rails'
 
   gem 'spring'
   gem 'spring-commands-rspec'
@@ -44,15 +65,18 @@ end
 
 group :test do
   gem 'coveralls', require: false
-  gem 'simplecov'
+  gem 'simplecov', require: false
 
   gem 'rspec-rails'
-  gem 'rspec-its'
+  gem 'rspec-given'
   gem 'capybara'
   gem 'factory_girl_rails'
-  gem 'sms-spec'
   gem 'database_cleaner'
+  gem 'vcr'
+  gem 'webmock'
   gem 'zonebie'
+  gem 'timecop'
+  gem 'poltergeist'
 end
 
 gem 'newrelic_rpm'

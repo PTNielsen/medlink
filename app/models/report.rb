@@ -1,32 +1,24 @@
-class Report
-  attr_accessor :rows
+module Report
+  class InvalidName < StandardError
+    def initialize name
+      @name = name
+    end
 
-  def to_csv opts={}
-    CSV.generate(opts) do |csv|
-      csv << columns
-      cleaned_rows.each { |values| csv << values }
+    def to_s
+      names = Report.names.map { |n| "`#{n}`" }.join ", "
+      "`#@name` - should be one of #{names}"
     end
   end
 
-  def cleaned_rows
-    rows.find_each.map do |obj|
-      format(obj).values.map { |v| clean v }
-    end.select { |values| values.any? &:present? }
+  def self.all
+    [Report::OrderHistory, Report::Users, Report::PcmoResponseTimes]
   end
 
-  def clean value
-    raise "Unconverted ActiveRecord in CSV" if value.is_a?(ActiveRecord::Base)
-    value.to_s.gsub("\n", " ")
+  def self.names
+    all.map { |klass| klass.title.downcase }
   end
 
-  private #---------
-
-  # This is a hack to get the column names even if we don't have any
-  #   rows to print out. It may be too clever, but it is at least localized.
-  class NullObject
-    def method_missing(*args, &block); self; end
-  end
-  def columns
-    format(NullObject.new).keys
+  def self.named name
+    all.find { |klass| klass.title.downcase == name } || raise(InvalidName.new name)
   end
 end

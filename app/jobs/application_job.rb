@@ -1,8 +1,10 @@
 class ApplicationJob < ActiveJob::Base
   rescue_from StandardError do |error|
-    # :nocov:
-    Slackbot.new.message "#{self.class}: #{error}" if Rails.env.production?
+    Medlink.notify Notification::JobError.new klass: self.class, error: error
     raise error
-    # :nocov:
+  end
+
+  def perform_later
+    self.class.perform_later(*arguments)
   end
 end

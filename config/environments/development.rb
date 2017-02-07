@@ -25,22 +25,20 @@ Medlink::Application.configure do
   # Expands the lines which load the assets
   config.assets.debug = true
 
-  # For Devise
   config.action_mailer.default_url_options = { host: 'localhost:3000' }
   config.action_mailer.delivery_method = :letter_opener
+  Rails.application.routes.default_url_options[:host] = "localhost:3000"
 
   config.eager_load = false
 
   config.after_initialize do
-    Bullet.enable = true
-    Bullet.raise  = true
-  end if ENV["BULLET"]
-end
+    Bullet.enable     = true
+    Bullet.add_footer = true
+  end unless ENV["NO_BULLET"]
 
-# Stub out the Twilio Client
-%w(ACCOUNT_SID AUTH PHONE_NUMBER).each { |k| ENV["TWILIO_#{k}"] ||= "*****" }
-class Twilio::REST::ListResource
-  def create msg
-    Rails.logger.info "Should send SMS: #{msg}"
-  end
+  #config.container.register :pingbot, -> { Slackbot.build(
+  #  channel:    "#medlink-logs",
+  #  username:   "Medlink [DEV]",
+  #  icon_emoji: ":computer:"
+  #) }
 end

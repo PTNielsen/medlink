@@ -1,4 +1,5 @@
 require 'sidekiq/web'
+
 Medlink::Application.routes.draw do
   devise_for :users, controllers: { confirmations: "confirmations" }, skip: [:registrations]
   as :user do
@@ -8,30 +9,29 @@ Medlink::Application.routes.draw do
     post  'users/sign_in/help' => 'users#send_login_help', as: 'send_login_help'
   end
 
-  resources :country_supplies, only: [:index, :create]
-
-  resource :user, only: [:edit, :update] do
-    get   '/welcome/video' => 'users#welcome_video', as: 'welcome_video'
-    post  '/welcome' => 'users#confirm_welcome', as: 'welcome_shown'
-  end
+  resource :welcome, only: [:show, :update]
 
   resources :users, only: [] do
-    member do
-      get :timeline
-    end
+    resource  :timeline, only: [:show]
+    resources :responses, only: [:new, :create]
+  end
+  patch "/user/country"  => "users#set_country", as: :set_country
 
-    resources :responses, only: [:new, :create, :show] do
-      post :archive
-      post :unarchive
+  resource :timeline, only: [:show]
+
+  resources :messages, only: [:index] do
+    collection do
+      get  :tester
+      post :test
     end
   end
-
-  resources :messages, only: [:index]
-  resources :announcements do
+  resources :announcements, except: [:show] do
     member do
       post :deliver
     end
   end
+
+  resource :receipts, only: [:edit, :update]
 
   resources :requests, only: [:new, :create]
 
@@ -41,13 +41,15 @@ Medlink::Application.routes.draw do
     end
   end
 
-  resources :orders, only: [:index] do
+  resource :notifier, only: [:show, :update]
+
+  resources :orders, only: [] do
     collection do
       get :manage
     end
   end
 
-  resources :responses, only: [:index] do
+  resources :responses, only: [:index, :show] do
     member do
       post :mark_received
       post :flag
@@ -56,33 +58,79 @@ Medlink::Application.routes.draw do
     end
   end
 
-  resources :reports, only: [:index] do
-    collection do
-      get :order_history
-      get :users
-      get :pcmo_response_times
+  resources :reports, only: [:index], param: :name do
+    get :download
+  end
+
+  resource :country, only: [:update] do
+    resources :supplies, only: [:index], controller: "country_supplies" do
+      member do
+        patch :toggle
+      end
+    end
+
+    resource :roster, only: [:show, :edit, :update] do
+      collection do
+        post :upload
+        get  :poll
+      end
     end
   end
 
   namespace :admin do
+    root  "pages#dashboard"
+
     resources :users, only: [:new, :create, :edit, :update] do
       member do
-        patch :inactivate
+        post   :activate
+        delete :inactivate
       end
 
       collection do
-        post :upload_csv
-        post :set_country
+        get :select
       end
     end
   end
 
   get '/help' => 'pages#help'
+  get '/.well-known/acme-challenge/:id' => 'pages#letsencrypt'
   root to: 'pages#root'
 
   post '/medrequest' => 'twilio#receive'
+  post '/slack'      => 'slack#command'
 
   authenticate :user, lambda { |u| u.admin? } do
     mount Sidekiq::Web => '/sidekiq', as: 'sidekiq'
+  end
+
+  namespace :api do
+    namespace :v1 do
+      post '/auth'       => 'auth#login'
+      post '/auth/phone' => 'auth#phone_login'
+      get  '/auth'       => 'auth#test'
+
+      resources :countries, only: [] do
+        resources :users, only: [:index]
+      end
+
+      resources :supplies, only: [:index] do
+        collection do
+          get '/all' => 'supplies#master_list'
+        end
+      end
+
+      resources :orders, only: [:index]
+
+      resources :requests, only: [:create, :index]
+
+      resources :users, only: [:index, :update]
+
+      resources :responses, only: [] do
+        member do
+          post :mark_received
+          post :flag
+        end
+      end
+    end
   end
 end

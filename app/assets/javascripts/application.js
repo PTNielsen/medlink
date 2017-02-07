@@ -14,6 +14,9 @@
 //= require jquery_ujs
 //= require messenger
 //= require messenger-theme-future
+//= require chosen.jquery
+//= require s3_direct_upload
+//= require react
+//= require react_ujs
 //= require main
-//= require jquery-placeholder
-//= require jquery_nested_form
+//= require_tree .

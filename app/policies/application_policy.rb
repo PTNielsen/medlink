@@ -6,10 +6,6 @@ class ApplicationPolicy
     @record = record
   end
 
-  def show?
-    scope.where(:id => record.id).exists?
-  end
-
   def create?
     country_admin?
   end
@@ -24,10 +20,6 @@ class ApplicationPolicy
 
   def edit?
     update?
-  end
-
-  def scope
-    Pundit.policy_scope!(user, record.class)
   end
 
   def admin?
@@ -59,6 +51,10 @@ class ApplicationPolicy
         scope.all
       elsif user.pcmo?
         scope.where(country_id: user.country_id)
+      else
+        # :nocov:
+        scope.none
+        # :nocov:
       end
     end
   end
