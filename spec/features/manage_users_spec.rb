@@ -10,6 +10,7 @@ describe "User management" do
   it "redirects non-admin users" do
     logout
     login create :pcmo
+    binding.pry
     visit new_admin_user_path
 
     expect( alert.text ).to match /must be an admin/i
